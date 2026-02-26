@@ -69,8 +69,23 @@ Use your [Hugging Face token](https://huggingface.co/settings/tokens) as passwor
    - After build, the Space shows a **Run trends scraper** button; click it to run the scraper. Logs appear in the UI; results are sent to n8n if `N8N_WEBHOOK_URL` is set.
 
 5. **Notes**
-   - The Space runs the scraper **on demand** when you click the button (no cron on HF free tier).
-   - For scheduled runs, use an external cron (e.g. GitHub Actions, or your n8n cron) that calls your Space or a separate deployment.
+   - The Space runs the scraper **on demand** when you click the button.
+   - For **automatic runs** three times a day (morning, afternoon, night), see **Scheduled runs** below.
+
+---
+
+## Scheduled runs (GitHub Actions)
+
+The repo includes a workflow that runs the scraper **three times a day** (08:00, 14:00, 20:00 UTC).
+
+1. **Add the webhook URL in GitHub**
+   - Open the repo → **Settings** → **Secrets and variables** → **Actions**.
+   - **New repository secret**: name `N8N_WEBHOOK_URL`, value = your n8n webhook URL.
+
+2. **Runs**
+   - The workflow runs automatically on the schedule, or trigger it manually: **Actions** → **Run trends scraper** → **Run workflow**.
+
+To change times, edit `.github/workflows/run-trends.yml` and adjust the `cron` expressions (e.g. `0 7 * * *` for 07:00 UTC).
 
 ---
 

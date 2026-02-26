@@ -1,0 +1,36 @@
+# Run trends scraper on a schedule (morning, afternoon, night)
+name: Run trends scraper
+
+on:
+  schedule:
+    # 08:00, 14:00, 20:00 UTC (adjust for your timezone)
+    - cron: '0 8 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 20 * * *'
+  workflow_dispatch: # allow manual run
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run trends scraper
+        env:
+          HEADLESS: 'true'
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+        run: python run_scraper.py
