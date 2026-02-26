@@ -1,3 +1,11 @@
+---
+title: Selenium-trends
+sdk: docker
+emoji: 📈
+colorFrom: blue
+colorTo: green
+---
+
 # Google Trends Scraper (Selenium) → n8n
 
 Scrapes **Google Trends real-time (4h)** for **US, UK, Canada, Germany, and Switzerland**, fetches full content from top articles for each trend, and sends a single JSON payload to an **n8n webhook** so you can use trends and article content in your workflows.
@@ -25,6 +33,21 @@ Scrapes **Google Trends real-time (4h)** for **US, UK, Canada, Germany, and Swit
 ---
 
 ## Host on Hugging Face
+
+**Space repo (clone):**
+```bash
+git clone https://huggingface.co/spaces/Klain/Selenium-trends
+```
+
+**Push this project to the Space** (from your local `selenium-trends` folder):
+```bash
+cd selenium-trends
+git remote add hf https://huggingface.co/spaces/Klain/Selenium-trends
+git push hf main
+```
+Use your [Hugging Face token](https://huggingface.co/settings/tokens) as password when prompted (username = your HF username, e.g. `Klain`).
+
+---
 
 1. **Create a Space**
    - Go to [huggingface.co/spaces](https://huggingface.co/spaces) → **Create new Space**.
