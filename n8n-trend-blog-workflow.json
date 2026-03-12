@@ -1,0 +1,218 @@
+{
+  "name": "Auto Blog Post Generation from Google Trends",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trend-blog",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook receive JSON",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item;\nconst data = item.json.body ?? item.json;\nif (!data || !data.countries) return { json: { error: \"Invalid payload\" } };\n\nconst MIN_CONTENT_LENGTH = 100;\nconst results = [];\nfor (const c of data.countries) {\n  for (const trend of c.trends || []) {\n    const articles = trend.articles || [];\n    const articlesWithContent = articles.filter(a => a.success === true && (a.content || \"\").trim().length >= MIN_CONTENT_LENGTH);\n    const hasContent = articlesWithContent.length > 0;\n    \n    if (hasContent) {\n      results.push({\n        json: {\n          keyword: trend.keyword,\n          summary_for_ai: articlesWithContent.map((a) => (a.title ? `${a.title}\\n` : \"\") + (a.content || \"\").slice(0, 3000)).join(\"\\n\\n---\\n\\n\")\n        }\n      });\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "2",
+      "name": "Code Formatting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HF_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "=[INST] Rewrite the following news summary as a blog article.\\nRequirements: SEO optimized, minimum 800 words, human readable, add introduction and conclusion.\\nTopic: {{$json.keyword}}\\n\\nContent:\\n{{$json.summary_for_ai}}\\n\\nExpected Output ONLY JSON Format exactly like this:\\n{\\n \\\"title\\\": \\\"...\\\",\\n \\\"blog_content\\\": \\\"<html blog content>\\\",\\n \\\"tags\\\": [\\\"...\\\"],\\n \\\"meta_description\\\": \\\"...\\\"\\n} [/INST]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "AI Rewrite (Mistral-7B)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const aiOutputRaw = $input.item.json.generated_text || $input.item.json[0].generated_text;\n  // Mistral sometimes returns the output appended to input. We need to extract the JSON block\n  const jsonMatch = aiOutputRaw.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    return {\n      json: {\n        keyword: $node[\"Code Formatting\"].json.keyword,\n        ...parsed\n      }\n    };\n  }\n  return { json: { error: \"Failed to parse JSON\" } };\n} catch (e) {\n  return { json: { error: e.message } };\n}"
+      },
+      "id": "4",
+      "name": "Parse Mistral JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HF_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "=Blog illustration for article about: {{$json.keyword}}. Style: modern tech blog, clean, professional, high resolution"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "5",
+      "name": "Image Generator (SDXL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-nextjs-app.com/api/blog/create",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.title }}"
+            },
+            {
+              "name": "slug",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.title.toLowerCase().replace(/\\s+/g, '-') }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.blog_content }}"
+            },
+            {
+              "name": "tags",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.tags }}"
+            },
+            {
+              "name": "published",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6",
+      "name": "Publish to Next.js Blog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1250,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook receive JSON": {
+      "main": [
+        [
+          {
+            "node": "Code Formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Formatting": {
+      "main": [
+        [
+          {
+            "node": "AI Rewrite (Mistral-7B)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Rewrite (Mistral-7B)": {
+      "main": [
+        [
+          {
+            "node": "Parse Mistral JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Mistral JSON": {
+      "main": [
+        [
+          {
+            "node": "Image Generator (SDXL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Generator (SDXL)": {
+      "main": [
+        [
+          {
+            "node": "Publish to Next.js Blog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

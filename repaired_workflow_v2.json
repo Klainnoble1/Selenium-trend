@@ -1,0 +1,191 @@
+{
+  "name": "Auto Blog Post Generation from Google Trends",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trend-blog",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook receive JSON",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "4171e03e-939c-446e-840c-12eadcc8ce17"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItems = $input.all();\nconst MIN_CONTENT_LENGTH = 100;\nconst out = [];\n\nfor (const item of inputItems) {\n  const data = item.json?.body ?? item.json;\n  if (!data || !Array.isArray(data.countries)) continue;\n\n  for (const c of data.countries) {\n    for (const trend of (c.trends || [])) {\n      const keyword = (trend.keyword || \"\").trim();\n      if (!keyword) continue;\n\n      const articles = Array.isArray(trend.articles) ? trend.articles : [];\n      const good = articles.filter(a =>\n        a &&\n        a.success === true &&\n        typeof a.content === \"string\" &&\n        a.content.trim().length >= MIN_CONTENT_LENGTH\n      );\n\n      if (!good.length) continue;\n\n      out.push({\n        json: {\n          keyword,\n          country: c.country || \"\",\n          geo: c.geo || \"\",\n          summary_for_ai: good\n            .map(a => (a.title ? `${a.title}\\n` : \"\") + a.content.slice(0, 700))\n            .join(\"\\n\\n---\\n\\n\"),\n        },\n      });\n    }\n  }\n}\n\nreturn out.length ? out.slice(0, 10) : [{ json: { error: \"No trends with sufficient content\" } }];\n"
+      },
+      "id": "2",
+      "name": "Code Formatting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"model\":\"llama-3.1-8b-instant\",\"messages\":[{\"role\":\"system\",\"content\":\"You rewrite news summaries into SEO blog posts and return strict JSON with keys: title, blog_content, tags, meta_description. Keep responses concise.\"},{\"role\":\"user\",\"content\":\"Topic: \" + ($json.keyword || \"\") + \"\\n\\nContent:\\n\" + (($json.summary_for_ai || \"\").slice(0, 1800)) }],\"temperature\":0.2,\"max_tokens\":1500} }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 8000
+            }
+          }
+        }
+      },
+      "id": "3",
+      "name": "AI Rewrite (Mistral-7B)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        656,
+        304
+      ],
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const aiOutputRaw = $input.item.json.choices[0].message.content;\n  const jsonMatch = aiOutputRaw.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    return {\n      json: {\n        keyword: $node[\"Code Formatting\"].json.keyword,\n        ...parsed\n      }\n    };\n  }\n  return { json: { error: \"Failed to parse JSON\", raw: aiOutputRaw } };\n} catch (e) {\n  return { json: { error: e.message } };\n}"
+      },
+      "id": "4",
+      "name": "Parse Mistral JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://my-blog-ten-gamma-87.vercel.app/api/blog/create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 786273jiahgsdiuhjsda8721y378213nbsadjhgsdajhgsajdg982738972931"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.title }}"
+            },
+            {
+              "name": "slug",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.title.toLowerCase().replace(/\\s+/g, '-') }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.blog_content }}"
+            },
+            {
+              "name": "tags",
+              "value": "={{ $node[\"Parse Mistral JSON\"].json.tags }}"
+            },
+            {
+              "name": "published",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6",
+      "name": "Publish to Next.js Blog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1264,
+        304
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook receive JSON": {
+      "main": [
+        [
+          {
+            "node": "Code Formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Formatting": {
+      "main": [
+        [
+          {
+            "node": "AI Rewrite (Mistral-7B)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Rewrite (Mistral-7B)": {
+      "main": [
+        [
+          {
+            "node": "Parse Mistral JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Mistral JSON": {
+      "main": [
+        [
+          {
+            "node": "Publish to Next.js Blog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "id": "S7LQxpXYjT5ziTmd"
+}

@@ -1,0 +1,16 @@
+services:
+  selenium-trends:
+    build: .
+    container_name: selenium-trends-worker
+    restart: unless-stopped
+    environment:
+      APP_MODE: worker
+      RUN_ONCE: "false"
+      SCRAPE_INTERVAL_MINUTES: "360"
+      HEADLESS: "true"
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_WEBHOOK_METHOD: ${N8N_WEBHOOK_METHOD:-POST}
+      N8N_ACCESS_TOKEN: ${N8N_ACCESS_TOKEN}
+      N8N_WEBHOOK_AUTH_HEADER: ${N8N_WEBHOOK_AUTH_HEADER:-Authorization}
+      OPENCLAW_WEBHOOK_URL: ${OPENCLAW_WEBHOOK_URL:-}
+      COUNTRIES: ${COUNTRIES:-}

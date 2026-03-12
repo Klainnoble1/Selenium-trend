@@ -14,6 +14,7 @@ Usage:
 import os
 import json
 import time
+import requests
 from dotenv import load_dotenv
 
 from config import TREND_COUNTRIES, MAX_ARTICLES_PER_TREND, SEARCH_URLS_TO_TRY, MIN_ARTICLE_CONTENT_LENGTH
@@ -28,7 +29,7 @@ load_dotenv()
 def main():
     headless = os.environ.get("HEADLESS", "true").lower() == "true"
     countries_filter = os.environ.get("COUNTRIES", "").strip()
-    webhook_url = os.environ.get("N8N_WEBHOOK_URL")
+    webhook_url = (os.environ.get("N8N_WEBHOOK_URL") or "").strip()
 
     if countries_filter:
         geos = [g.strip().upper() for g in countries_filter.split(",")]
@@ -114,6 +115,30 @@ def main():
             print("n8n send failed:", result.get("error") or result.get("response"))
     else:
         print("N8N_WEBHOOK_URL not set. Set it in .env to send to n8n.")
+
+    # Send to Open Claw (one request per country)
+    openclaw_url = (os.environ.get("OPENCLAW_WEBHOOK_URL") or "").strip()
+    if openclaw_url:
+        for country_data in trends_by_country:
+            region = country_data.get("geo", "US")
+            trends = [t.get("keyword", "").strip() for t in country_data.get("trends", []) if t.get("keyword")]
+            if not trends:
+                continue
+            try:
+                r = requests.post(
+                    openclaw_url,
+                    json={"trends": trends, "region": region},
+                    headers={"Content-Type": "application/json"},
+                    timeout=30,
+                )
+                if r.ok:
+                    print(f"Open Claw ({region}): sent {len(trends)} trends.")
+                else:
+                    print(f"Open Claw ({region}): {r.status_code} {r.text[:200]}")
+            except Exception as e:
+                print(f"Open Claw ({region}): {e}")
+    else:
+        print("OPENCLAW_WEBHOOK_URL not set. Set it in .env to send to Open Claw.")
 
 
 if __name__ == "__main__":

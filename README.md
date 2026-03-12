@@ -160,12 +160,15 @@ Use this in n8n to drive workflows (e.g. filter by country, loop over trends, us
 
 | Variable | Description |
 |----------|-------------|
-| `N8N_WEBHOOK_URL` | n8n webhook URL (required to send to n8n). |
+| `N8N_WEBHOOK_URL` | n8n webhook URL (required to send to n8n). Use **production** URL (`/webhook/...`) and **activate** the workflow. |
+| `OPENCLAW_WEBHOOK_URL` | Open Claw webhook URL. If direct IP times out, use the **ngrok** URL from the Open Claw server. |
 | `HEADLESS` | `true` (default) or `false` to show the browser. |
 | `COUNTRIES` | Comma-separated geo codes, e.g. `US,GB`. Omit to use all five (US, GB, CA, DE, CH). |
 
 ## Troubleshooting
 
+- **n8n 404 "webhook not registered"**: Use the **production** webhook URL (path `/webhook/...`, not `/webhook-test/...`) and **activate** the workflow in n8n (toggle Active on).
+- **Open Claw connection timeout**: Direct IP (e.g. `http://47.91.2.105:8765/webhook`) is often blocked by firewalls. On the Open Claw server run ngrok and set `OPENCLAW_WEBHOOK_URL` to the ngrok HTTPS URL (e.g. `https://xxxx.ngrok.io/webhook`).
 - **No trends / empty list**: Google’s real-time page may have changed structure. You may need to adjust selectors in `trends_scraper.py` (e.g. `div[class*='trend']`, `div[role='listitem']`, or table rows).
 - **4h window**: The script tries to click a “Past 4 hours” style control if present; otherwise it uses whatever timeframe the page defaults to (often real-time / 4h).
 - **Article content empty**: Some sites block scrapers or use heavy JavaScript; those URLs may have `"success": false` and empty `content`.

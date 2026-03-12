@@ -16,6 +16,7 @@ from config import (
     TRENDS_HOURS,
     MAX_TRENDS_PER_COUNTRY,
     MAX_ARTICLES_PER_TREND,
+    COUNTRY_DELAY_SECONDS,
 )
 
 
@@ -138,9 +139,10 @@ def scrape_all_trends(headless: bool = True, countries: list[dict] | None = None
     """
     driver = create_driver(headless=headless)
     to_scrape = countries if countries is not None else TREND_COUNTRIES
+    country_delay_seconds = int(os.environ.get("COUNTRY_DELAY_SECONDS", str(COUNTRY_DELAY_SECONDS)))
     results = []
     try:
-        for country in to_scrape:
+        for index, country in enumerate(to_scrape):
             print(f"Scraping {country['name']} ({country['geo']})...")
             trends = scrape_country_trends(driver, country)
             results.append({
@@ -148,7 +150,11 @@ def scrape_all_trends(headless: bool = True, countries: list[dict] | None = None
                 "geo": country["geo"],
                 "trends": trends,
             })
-            time.sleep(1)  # Be nice to the server
+            if index < len(to_scrape) - 1 and country_delay_seconds > 0:
+                print(
+                    f"Waiting {country_delay_seconds} seconds before scraping the next country...",
+                )
+                time.sleep(country_delay_seconds)
     finally:
         driver.quit()
     return results

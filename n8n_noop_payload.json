@@ -1,0 +1,171 @@
+﻿{
+    "settings":  {
+
+                 },
+    "name":  "Auto Blog Post Generation from Google Trends",
+    "connections":  {
+                        "Webhook receive JSON":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Code Formatting",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "Code Formatting":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "AI Rewrite (Mistral-7B)",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "AI Rewrite (Mistral-7B)":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Code in JavaScript",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "Code in JavaScript":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "Publish to Next.js Blog",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               }
+                    },
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "trend-blog",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "1",
+                      "name":  "Webhook receive JSON",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       256,
+                                       304
+                                   ],
+                      "webhookId":  "4171e03e-939c-446e-840c-12eadcc8ce17"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const inputItems = $input.all();\nconst MIN_CONTENT_LENGTH = 100;\nconst out = [];\n\nfor (const item of inputItems) {\n  const data = item.json?.body ?? item.json;\n  if (!data || !Array.isArray(data.countries)) continue;\n\n  for (const c of data.countries) {\n    for (const trend of (c.trends || [])) {\n      const keyword = (trend.keyword || \"\").trim();\n      if (!keyword) continue;\n\n      const articles = Array.isArray(trend.articles) ? trend.articles : [];\n      const good = articles.filter(a =\u003e\n        a \u0026\u0026\n        a.success === true \u0026\u0026\n        typeof a.content === \"string\" \u0026\u0026\n        a.content.trim().length \u003e= MIN_CONTENT_LENGTH\n      );\n\n      if (!good.length) continue;\n\n      out.push({\n        json: {\n          keyword,\n          country: c.country || \"\",\n          geo: c.geo || \"\",\n          summary_for_ai: good\n            .map(a =\u003e (a.title ? `${a.title}\\n` : \"\") + a.content.slice(0, 700))\n            .join(\"\\n\\n---\\n\\n\"),\n        },\n      });\n    }\n  }\n}\n\nreturn out.length ? out.slice(0, 10) : [{ json: { error: \"No trends with sufficient content\" } }];\n"
+                                     },
+                      "id":  "2",
+                      "name":  "Code Formatting",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       464,
+                                       304
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://api.groq.com/openai/v1/chat/completions",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "Bearer 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"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ {\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Return ONLY valid JSON with keys: title, blog_content, tags, meta_description. blog_content must be HTML using only h2, p, ul, li tags. No markdown. No explanation.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Topic: \" + ($json.keyword || \"\") + \"\\n\\nContent:\\n\" + (($json.summary_for_ai || \"\").slice(0, 1200))\n    }\n  ],\n  \"temperature\": 0.1,\n  \"max_tokens\": 500,\n  \"response_format\": { \"type\": \"json_object\" }\n} }}",
+                                         "options":  {
+                                                         "batching":  {
+                                                                          "batch":  {
+                                                                                        "batchSize":  1,
+                                                                                        "batchInterval":  8000
+                                                                                    }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "3",
+                      "name":  "AI Rewrite (Mistral-7B)",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.1,
+                      "position":  [
+                                       656,
+                                       304
+                                   ],
+                      "continueOnFail":  false,
+                      "onError":  "stopWorkflow"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://my-blog-ten-gamma-87.vercel.app/api/blog/create",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "Bearer 786273jiahgsdiuhjsda8721y378213nbsadjhgsdajhgsajdg982738972931"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ {\"title\": $json.title || $json.keyword || \"Untitled\", \"slug\": (($json.title || $json.keyword || \"untitled\").toLowerCase().replace(/[^a-z0-9]+/g, \"-\").replace(/^-|-$/g, \"\")), \"content\": ($json.blog_content || \"\u003cp\u003eNo content generated.\u003c/p\u003e\"), \"featured_image\": ($json.image_url || $json.featured_image || $json.featuredImage || (\"https://image.pollinations.ai/prompt/\" + encodeURIComponent(($json.title || $json.keyword || \"technology news\") + \" editorial illustration, clean modern blog cover, high detail\") + \"?width=1400\u0026height=900\u0026nologo=true\")), \"tags\": (Array.isArray($json.tags) ? $json.tags : [$json.keyword || \"news\"]), \"published\": true } }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "6",
+                      "name":  "Publish to Next.js Blog",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.1,
+                      "position":  [
+                                       1312,
+                                       304
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "try {\n  const aiOutputRaw = $input.item.json.choices[0].message.content;\n  const jsonMatch = aiOutputRaw.match(/\\{[\\s\\S]*\\}/);\n\n  if (!jsonMatch) {\n    return { json: { error: \"Failed to parse JSON\", raw: aiOutputRaw } };\n  }\n\n  const parsed = JSON.parse(jsonMatch[0]);\n  const title = parsed.title || \"Untitled Post\";\n  const blogContent = parsed.blog_content || parsed.content || \"\";\n\n  return {\n    json: {\n      title,\n      slug: title\n        .toLowerCase()\n        .replace(/[^\\w\\s-]/g, \u0027\u0027)\n        .replace(/[\\s_-]+/g, \u0027-\u0027)\n        .replace(/^-+|-+$/g, \u0027\u0027),\n      blog_content: blogContent,\n      content: blogContent,\n      tags: Array.isArray(parsed.tags) ? parsed.tags : [],\n      meta_description: parsed.meta_description || \"\",\n      published: true\n    }\n  };\n} catch (e) {\n  return { json: { error: e.message } };\n}"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       864,
+                                       304
+                                   ],
+                      "id":  "e8466dac-f4ae-4cd9-9660-53e2ebb62f04",
+                      "name":  "Code in JavaScript"
+                  }
+              ]
+}

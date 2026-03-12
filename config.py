@@ -33,6 +33,10 @@ MIN_ARTICLE_CONTENT_LENGTH = 150
 # Request timeout for fetching article content (seconds)
 ARTICLE_REQUEST_TIMEOUT = 15
 
+# Delay between scraping each country's trend page (seconds).
+# Default: 10 minutes to reduce rate-limit pressure.
+COUNTRY_DELAY_SECONDS = 600
+
 # User agent for requests (some sites block default)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

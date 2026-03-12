@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "url": "https://bay-blog.vercel.app/api/blog/create",
+  "headers": {
+    "Authorization": "Bearer 786273jiahgsdiuhjsda8721y378213nbsadjhgsdajhgsajdg982738972931",
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "title": "{{ $node[\"Parse Mistral JSON\"].json.title }}",
+    "slug": "{{ $node[\"Parse Mistral JSON\"].json.title.toLowerCase().replace(/\\s+/g, '-') }}",
+    "content": "{{ $node[\"Parse Mistral JSON\"].json.blog_content }}",
+    "tags": "{{ $node[\"Parse Mistral JSON\"].json.tags }}",
+    "published": true
+  }
+}
