@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run the Google Trends source only.
+Run the NewsAPI trends source only.
 """
 
 import os
@@ -8,8 +8,8 @@ import os
 from dotenv import load_dotenv
 
 from config import TREND_COUNTRIES
+from newsapi_source import fetch_newsapi_trends
 from source_pipeline import build_payload, enrich_trends_with_articles, save_payload, send_payload
-from trends_scraper import scrape_all_trends
 
 load_dotenv()
 
@@ -28,11 +28,20 @@ def main() -> None:
         print("No countries to scrape. Set COUNTRIES=US,GB,CA,DE,CH or leave unset for all.")
         return
 
-    print("Scraping Google Trends (real-time / 4h) for:", [c["geo"] for c in countries])
-    trends_by_country = scrape_all_trends(headless=headless, countries=countries)
+    print("Fetching NewsAPI trends for:", [c["geo"] for c in countries])
+    trends_by_country = []
+    for country in countries:
+        trends_by_country.append(
+            {
+                "country": country["name"],
+                "geo": country["geo"],
+                "trends": fetch_newsapi_trends(country),
+            }
+        )
+
     trends_by_country = enrich_trends_with_articles(trends_by_country, headless=headless)
-    payload = build_payload("google-trends-selenium", "4h", trends_by_country)
-    save_payload(payload, "google")
+    payload = build_payload("newsapi-headlines", "live", trends_by_country)
+    save_payload(payload, "newsapi")
     send_payload(payload)
 
 

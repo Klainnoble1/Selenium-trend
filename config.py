@@ -33,9 +33,25 @@ MIN_ARTICLE_CONTENT_LENGTH = 150
 # Request timeout for fetching article content (seconds)
 ARTICLE_REQUEST_TIMEOUT = 15
 
+# Request timeout for API-based trend sources (seconds)
+API_REQUEST_TIMEOUT = 20
+
 # Delay between scraping each country's trend page (seconds).
 # Default: 10 minutes to reduce rate-limit pressure.
 COUNTRY_DELAY_SECONDS = 600
+
+# Max trends to process per country from API sources
+MAX_X_TRENDS_PER_COUNTRY = 5
+MAX_NEWSAPI_TRENDS_PER_COUNTRY = 5
+
+# X country-level WOEIDs for trends/place
+X_WOEIDS = {
+    "US": 23424977,
+    "GB": 23424975,
+    "CA": 23424775,
+    "DE": 23424829,
+    "CH": 23424957,
+}
 
 # User agent for requests (some sites block default)
 USER_AGENT = (

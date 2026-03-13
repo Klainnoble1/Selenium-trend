@@ -1,131 +1,122 @@
 ---
 title: Selenium-trends
 sdk: docker
-emoji: 📈
+emoji: "📈"
 colorFrom: blue
 colorTo: green
 ---
 
-# Google Trends Scraper (Selenium) → n8n
+# Google Trends Scraper -> n8n
 
-Scrapes **Google Trends real-time (4h)** for **US, UK, Canada, Germany, and Switzerland**, fetches full content from top articles for each trend, and sends a single JSON payload to an **n8n webhook** so you can use trends and article content in your workflows.
+Production path:
+- Google Trends only
 
----
+Experimental code kept in repo:
+- X trends
+- NewsAPI trends
 
-## Push to GitHub
+The production scraper collects Google Trends for:
+- United States
+- United Kingdom
+- Canada
+- Germany
+- Switzerland
 
-1. **Initialize git** (if not already a repo):
-   ```bash
-   cd selenium-trends
-   git init
-   ```
+Then it:
+- finds article URLs
+- extracts article content
+- sends one JSON payload to n8n
 
-2. **Add the remote** and push:
-   ```bash
-   git remote add origin https://github.com/Klainnoble1/Selenium-trend.git
-   git add .
-   git commit -m "Initial commit: trends scraper + Docker + Gradio for HF"
-   git branch -M main
-   git push -u origin main
-   ```
-   Use a [personal access token](https://github.com/settings/tokens) if prompted for password.
-
----
-
-## Host on Hugging Face
-
-**Space repo (clone):**
-```bash
-git clone https://huggingface.co/spaces/Klain/Selenium-trends
-```
-
-**Push this project to the Space** (from your local `selenium-trends` folder):
-```bash
-cd selenium-trends
-git remote add hf https://huggingface.co/spaces/Klain/Selenium-trends
-git push hf main
-```
-Use your [Hugging Face token](https://huggingface.co/settings/tokens) as password when prompted (username = your HF username, e.g. `Klain`).
-
----
-
-1. **Create a Space**
-   - Go to [huggingface.co/spaces](https://huggingface.co/spaces) → **Create new Space**.
-   - Name it (e.g. `Selenium-trend`), choose **Docker** as SDK, set visibility (Public/Private).
-
-2. **Connect your GitHub repo**
-   - In the Space creation form, choose **Link to a Git repository** and enter:
-     - Repository: `Klainnoble1/Selenium-trend` (or your fork).
-   - Or: after creating the Space, in **Settings → Repository**, connect the GitHub repo so HF builds from it.
-
-3. **Add secrets**
-   - Open your Space → **Settings** → **Repository secrets**.
-   - Add:
-     - `N8N_WEBHOOK_URL` = your n8n webhook URL (e.g. `https://your-n8n.com/webhook/xxxx`).
-   - Optional: `N8N_WEBHOOK_METHOD` = `POST` (default).
-
-4. **Build**
-   - HF builds from the **Dockerfile** in the repo (installs Chromium, Python deps, runs the Gradio app).
-   - After build, the Space shows a **Run trends scraper** button; click it to run the scraper. Logs appear in the UI; results are sent to n8n if `N8N_WEBHOOK_URL` is set.
-
-5. **Notes**
-   - The Space runs the scraper **on demand** when you click the button.
-   - For **automatic runs** three times a day (morning, afternoon, night), see **Scheduled runs** below.
-
----
-
-## Scheduled runs (GitHub Actions)
-
-The repo includes a workflow that runs the scraper **three times a day** (08:00, 14:00, 20:00 UTC).
-
-1. **Add the webhook URL in GitHub**
-   - Open the repo → **Settings** → **Secrets and variables** → **Actions**.
-   - **New repository secret**: name `N8N_WEBHOOK_URL`, value = your n8n webhook URL.
-
-2. **Runs**
-   - The workflow runs automatically on the schedule, or trigger it manually: **Actions** → **Run trends scraper** → **Run workflow**.
-
-To change times, edit `.github/workflows/run-trends.yml` and adjust the `cron` expressions (e.g. `0 7 * * *` for 07:00 UTC).
-
----
-
-## Requirements
-
-- **Python 3.10+**
-- **Chrome** (for Selenium/ChromeDriver; webdriver-manager installs the driver automatically)
-
-## Setup
-
-```bash
-cd selenium-trends
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-# source .venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-cp .env.example .env
-```
-
-Edit `.env` and set your n8n webhook URL:
-
-```env
-N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/xxxx
-HEADLESS=true
-```
-
-## Run
+## Production Run
 
 ```bash
 python run_scraper.py
 ```
 
-- Trends are scraped per country from:  
-  `https://trends.google.com/trends/trendingsearches/realtime?geo=XX&hl=...`
-- For each trend, the script finds related article links on the page and fetches **full text content** (via `trafilatura`).
-- Output is written to `trends_output.json` and, if `N8N_WEBHOOK_URL` is set, **POSTed to n8n**.
+Equivalent:
 
-## n8n payload shape
+```bash
+python run_google_trends.py
+```
 
-n8n receives one JSON body per run, e.g.:
+## Experimental Runners
+
+These are kept for later and are not part of the recommended production path:
+
+```bash
+python run_x_trends.py
+python run_newsapi_trends.py
+```
+
+## Hugging Face
+
+For production use on Hugging Face, treat Google as the supported path.
+
+Recommended Space env:
+
+```env
+APP_MODE=web
+HEADLESS=true
+COUNTRY_DELAY_SECONDS=600
+SCRAPER_SCRIPT=run_scraper.py
+N8N_WEBHOOK_URL=https://your-n8n-domain.com/webhook/trend-blog-google
+N8N_WEBHOOK_METHOD=POST
+N8N_WEBHOOK_AUTH_HEADER=Authorization
+N8N_ACCESS_TOKEN=
+```
+
+The UI includes buttons for Google, X, and NewsAPI because the code is still present. For production, use:
+- `Run Google Trends`
+
+## Worker Mode
+
+Worker mode can run a specific script:
+
+```env
+APP_MODE=worker
+RUN_ONCE=false
+SCRAPE_INTERVAL_MINUTES=360
+SCRAPER_SCRIPT=run_scraper.py
+```
+
+## Render Deployment
+
+Recommended Render service type:
+- Background Worker
+
+Recommended root directory:
+- `selenium-trends`
+
+Recommended production env for Google-only mode:
+
+```env
+APP_MODE=worker
+RUN_ONCE=false
+SCRAPE_INTERVAL_MINUTES=360
+SCRAPER_SCRIPT=run_scraper.py
+HEADLESS=true
+COUNTRY_DELAY_SECONDS=600
+N8N_WEBHOOK_URL=https://your-n8n-domain.com/webhook/trend-blog-google
+N8N_WEBHOOK_METHOD=POST
+N8N_WEBHOOK_AUTH_HEADER=Authorization
+N8N_ACCESS_TOKEN=
+COUNTRIES=
+OPENCLAW_WEBHOOK_URL=
+```
+
+Safer first deploy values:
+
+```env
+COUNTRIES=US,GB
+COUNTRY_DELAY_SECONDS=180
+```
+
+Notes:
+- Use Google-only mode in production.
+- Keep `SCRAPER_SCRIPT=run_scraper.py`.
+- Do not deploy this as a Render web service unless you specifically want the Gradio UI.
+
+## n8n Payload Shape
 
 ```json
 {
@@ -154,32 +145,50 @@ n8n receives one JSON body per run, e.g.:
 }
 ```
 
-Use this in n8n to drive workflows (e.g. filter by country, loop over trends, use `articles[].content` for summarization or posting).
+## Recommended n8n Workflows
 
-## Optional env vars
+Recommended production workflow:
+- one Google-only workflow
 
-| Variable | Description |
-|----------|-------------|
-| `N8N_WEBHOOK_URL` | n8n webhook URL (required to send to n8n). Use **production** URL (`/webhook/...`) and **activate** the workflow. |
-| `OPENCLAW_WEBHOOK_URL` | Open Claw webhook URL. If direct IP times out, use the **ngrok** URL from the Open Claw server. |
-| `HEADLESS` | `true` (default) or `false` to show the browser. |
-| `COUNTRIES` | Comma-separated geo codes, e.g. `US,GB`. Omit to use all five (US, GB, CA, DE, CH). |
+Suggested webhook:
+- `/webhook/trend-blog-google`
 
-## Troubleshooting
+If you decide to revisit the experimental sources later, create separate workflows:
+- `/webhook/trend-blog-x`
+- `/webhook/trend-blog-newsapi`
 
-- **n8n 404 "webhook not registered"**: Use the **production** webhook URL (path `/webhook/...`, not `/webhook-test/...`) and **activate** the workflow in n8n (toggle Active on).
-- **Open Claw connection timeout**: Direct IP (e.g. `http://47.91.2.105:8765/webhook`) is often blocked by firewalls. On the Open Claw server run ngrok and set `OPENCLAW_WEBHOOK_URL` to the ngrok HTTPS URL (e.g. `https://xxxx.ngrok.io/webhook`).
-- **No trends / empty list**: Google’s real-time page may have changed structure. You may need to adjust selectors in `trends_scraper.py` (e.g. `div[class*='trend']`, `div[role='listitem']`, or table rows).
-- **4h window**: The script tries to click a “Past 4 hours” style control if present; otherwise it uses whatever timeframe the page defaults to (often real-time / 4h).
-- **Article content empty**: Some sites block scrapers or use heavy JavaScript; those URLs may have `"success": false` and empty `content`.
+Do not merge those sources into the Google production workflow.
 
-## Project layout
+## Environment Variables
 
-- `config.py` – Countries (geo/hl), URLs, limits.
-- `trends_scraper.py` – Selenium: load real-time trends page per country, extract trend keywords and article URLs.
-- `google_search.py` – DuckDuckGo search for article URLs per trend.
-- `article_extractor.py` – Fetch article URL and extract main text with `trafilatura`.
-- `n8n_sender.py` – POST aggregated payload to n8n webhook.
-- `run_scraper.py` – Orchestrates scrape → extract → save → send.
-- `app.py` – Gradio UI for Hugging Face Space (run scraper on demand).
-- `Dockerfile` – Docker image with Chromium for HF Spaces.
+Required for production:
+- `N8N_WEBHOOK_URL`
+- `HEADLESS`
+
+Optional:
+- `COUNTRIES`
+- `COUNTRY_DELAY_SECONDS`
+- `OPENCLAW_WEBHOOK_URL`
+- `SCRAPER_SCRIPT`
+
+Experimental only:
+- `X_API_KEY`
+- `X_API_KEY_SECRET`
+- `X_ACCESS_TOKEN`
+- `X_ACCESS_TOKEN_SECRET`
+- `X_BEARER_TOKEN`
+- `NEWSAPI_KEY`
+
+## Project Layout
+
+- `run_scraper.py` - production Google runner
+- `run_google_trends.py` - Google alias runner
+- `run_x_trends.py` - experimental X runner
+- `run_newsapi_trends.py` - experimental NewsAPI runner
+- `source_pipeline.py` - shared enrich/save/send helpers
+- `trends_scraper.py` - Selenium Google Trends scraper
+- `google_search.py` - article URL search
+- `article_extractor.py` - article content extraction
+- `n8n_sender.py` - webhook sender
+- `app.py` - Hugging Face UI
+- `worker.py` - long-running worker entrypoint

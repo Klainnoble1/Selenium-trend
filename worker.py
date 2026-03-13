@@ -7,6 +7,8 @@ Environment:
   SCRAPE_INTERVAL_MINUTES=360
                        Delay between runs when looping.
   HEADLESS=true        Use headless browser mode.
+  SCRAPER_SCRIPT=run_scraper.py
+                       Choose source runner.
 """
 
 import os
@@ -19,10 +21,11 @@ from datetime import datetime, timezone
 def run_scraper_once() -> int:
     env = os.environ.copy()
     env.setdefault("HEADLESS", "true")
+    runner_script = env.get("SCRAPER_SCRIPT", "run_scraper.py").strip() or "run_scraper.py"
 
-    print(f"[{timestamp()}] Starting scraper run...", flush=True)
+    print(f"[{timestamp()}] Starting scraper run using {runner_script}...", flush=True)
     result = subprocess.run(
-        [sys.executable, "run_scraper.py"],
+        [sys.executable, runner_script],
         cwd=os.path.dirname(os.path.abspath(__file__)),
         env=env,
     )
